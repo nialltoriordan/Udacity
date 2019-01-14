@@ -1,0 +1,466 @@
+Red Wine Exploratory Data Analysis by Niall O'Riordan
+========================================================
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# Load all of the packages that you end up using in your analysis in this code
+# chunk.
+
+# Notice that the parameter "echo" was set to FALSE for this code chunk. This
+# prevents the code from displaying in the knitted HTML output. You should set
+# echo=FALSE for all code chunks in your file, unless it makes sense for your
+# report to show the code that generated a particular plot.
+
+# The other parameters for "message" and "warning" should also be set to FALSE
+# for other code chunks once you have verified that each plot comes out as you
+# want it to. This will clean up the flow of your report.
+
+library(ggplot2)
+library(GGally)
+library(RColorBrewer)
+library(gridExtra)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Load_the_Data}
+# Load the Data
+wines <- read.csv('wineQualityReds.csv')
+```
+
+#Introduction.
+
+The data set explored contains tidy data about red wine samples.  It contains 
+1599 observations of 11 input variables (chemical make-up based on physico-
+chemical tests) and one output variable (quality).  The output is based on 
+sensory data; the median of at least 3 evaluations made by wine experts on a 
+scale of 0 (bad) to 10 (good).  More information can be found in the file 
+descriptions.txt.
+
+#Initial Analysis.
+
+The first thing I did was run ggpairs() on the dataset (excluding X and q.cat),
+in order to get the correlation figures for all the pairs.  This can be 
+referenced below in the Bivariate Analysis section.
+
+The chemicals with the highest correlation are alcohol, volatile acids, 
+sulphates and citric acids respectively.  None are especially high with alcohol 
+approaching a moderate level of correlation at .4796 and volatile acids 
+meaning full but small at -0.391.  It's likely I'll also investigate sulphates
+at .251 and citric acids at .226.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Univariate_Exploration_1}
+vvqplot <- function(varname, binwidth = NULL) {
+  return(qplot(x = wines[varname], binwidth = binwidth))
+} #using this function causes grid.arrange error - investigate later
+#possibly add xlab()
+
+up1 <- qplot(x = alcohol, data = wines) 
+up2 <- qplot(x = volatile.acidity, data = wines) 
+up3 <- qplot(x = sulphates, data = wines) 
+up4 <- qplot(x = density, data = wines) 
+  
+grid.arrange(up1, up2, up3, up4, ncol = 1) 
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Univariate_Exploration_2}
+#vvqplot(wines$citric.acid) #still causing errors
+
+qplot(x = citric.acid, data = wines)
+
+```
+
+I don't think there's many insights to be gained from the univariate plots.  
+Most seem to have very small ranges and are very left sided.  Alcohol seems to
+have a slightly broader range and I'll be investigating this relationship later.
+
+Perhaps one interesting plot is the citric acid plot above.  There seems to be 
+a large amount of wines with low levels of citric acid.  This might explain the
+low correlation number; it's not so much that quality wines have a low level
+of citric acid, as almost all the wines have a low level of citric acid.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Univariate_Exploration_3}
+ggplot(wines, aes(x = factor(quality))) +
+   geom_bar() +
+  labs(x="Quality Score", y="Count")
+```
+
+Before moving on to the next section, I'm going to add a "q.cat" variable to 
+the dataset, with values "good" for wines rated 7-10, "fair" for "5-6", and 
+"poor" for the rest.  I think most users won't care about the specific rating
+of a wine, only whether it's a good wine or not.
+
+I had planned on using the values 8-10 for "good", but looking at the histogram
+above, it seems there's few wines in this category.  This raises some questions
+about the dataset.  The vast majority of wines were in the 5-6 range.  This can
+possibly be explained by the similarity of the wines being sampled.  I also 
+wonder how the wines were rated, and if there was an outside influence on the 
+judges?  For example, for the purposes of this project I saw no issue with 
+categorising some wines as "poor", but if the wine producers were present 
+during the rating, the judges may have been reluctant to rate the wine poorly.
+
+I considered removing the "X" variable as it seems pretty redundant.  I decided
+to keep it in case I sort the dataframe later and want to return it to it's
+original order.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Add_Category_variable}
+wines$q.cat <- cut(wines$quality, breaks = c(0, 4, 6, 10), 
+                   labels=  c("poor", "fair", "good")) 
+```
+
+As can be seen below, categorising the wines makes the lack of variety in the 
+quality ratings even more apparent.  
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Univariate_Exploration_4}
+qplot(x = q.cat, data = wines) 
+```
+
+#Bivariate Analysis
+
+I'll start by running ggpairs() to try and get a feel for the relationships 
+between the variables.  I've included the pdf ggpairsplot.pdf because the 
+output below may be difficult to see.  The univariate plots appear on the 
+diagonal, with bivariate plots below.
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Bivariate_Plots_G1}
+#no need to have index column or q.cat
+ggpairs(subset(wines, select = -c(X, q.cat)))
+```
+
+I didn't expect this to be very useful, and in my opinion it has turned out not
+to be.  We're only interested in what chemicals affect the quality rating of
+the wine, so graphing the rest of the relationships is pretty much a waste of 
+time.  The plots on the horizontal 'quality line' are also don't' seem very 
+useful.  All have discrete horizontal lines due to the 1-10 discrete quality 
+scale, and all seem to have relatively wide distributions.  All also seem to 
+suffer from over plotting.  I may try to reduce that to get more useful graphs 
+later.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Bivariate_Plots_A1}
+ggplot(aes(x = alcohol, y = quality), data = wines) +
+  xlim(quantile(wines$alcohol, 0.05), quantile(wines$alcohol, 0.95)) +
+  geom_jitter(aes(color = quality))
+```
+
+Above scatter plot doesn't seem very useful.  Comparing the light blue to the 
+dark, it is possible to see more light blue (high quality) observations at 
+higher alcohol levels, but maybe I should do a box plot instead.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Bivariate_Plots_A2}
+ggplot(aes(x = quality, y = alcohol, group = q.cat), data = wines) +
+  geom_boxplot(aes(color=q.cat))
+```
+
+The box plot above makes the correlation between quality and alcohol much easier
+to see.  To the judges linking quality and alcohol could be subconscious, though
+as we can see from some of the outliers in the "fair" it's not universal.  I've
+read that some scientists theorise that our brains respond in a similar way to 
+alcoholic sugars as regular sugar, so I kind of expected this.
+
+I am surprised how close the "fair" and "poor" categories are, and expected a
+more linear progression.  Some summary statistics are below, but don't seem to 
+reveal much.  I'd hoped to explore this further, wondering if a combination of
+chemicals makes the difference between "good" wines with high alcohol content 
+and "fair" wines with high alcohol content, but didn't spend the time on it.
+
+Summary of Alcohol Content (poor wines).
+
+```{r echo=FALSE, message=FALSE, warning=FALSE }
+summary(subset(wines$alcohol, wines$q.cat == "poor"))
+```
+
+Summary of Alcohol Content (fair wines).
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary(subset(wines$alcohol, wines$q.cat == "fair"))
+```
+
+Summary of Alcohol Content (good wines).
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary(subset(wines$alcohol, wines$q.cat == "good"))
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Bivariate_Plots_V1}
+ggplot(aes(x = volatile.acidity, y = quality), data = wines) +
+  xlim(quantile(wines$volatile.acidity, 0.05), quantile(wines$volatile.acidity, 0.95)) +
+  geom_point(aes(color = quality))
+```
+
+Again, the above scatter plot doesn't seem very useful.  It's possible to see 
+a lot more light blue observations at lower volatile acidity levels than dark
+blue, but I think I'll do a box plot again.
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Bivariate_Plots_V2}
+ggplot(aes(x = quality, y = volatile.acidity, group = q.cat), data = wines) +
+  geom_boxplot(aes(color=q.cat))
+
+```
+
+As can be seen in the box plot above, there appears to be a negative 
+correlation between fixed acidity and quality; as volatile acidity decreases, 
+quality increases.  This is to be expected, as wines with high levels of 
+volatile acidity are described as tasting "vinegary".  Some summary statistics
+are below but don't seem to reveal much.  It may be interesting to explore
+some of the "good" quality wines with high volatile acidity levels to see if
+we can identify if other chemicals are masking the taste.
+
+Summary of Volatile Acidity (poor wines).
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary(subset(wines$volatile.acidity, wines$q.cat == "poor"))
+```
+
+Summary of Volatile Acidity (fair wines).
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary(subset(wines$volatile.acidity, wines$q.cat == "fair"))
+```
+
+Summary of Volatile Acidity (good wines).
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+summary(subset(wines$volatile.acidity, wines$q.cat == "good"))
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Bivariate_Plots_S1}
+ggplot(aes(x = sulphates, y = quality), data = wines) +
+  xlim(quantile(wines$sulphates, 0.05), quantile(wines$sulphates, 0.95)) +
+  geom_point(aes(color = quality), alpha = 1/4)
+```
+
+The above scatter plot shows the relationship between sulphates and quality.
+I've attempted to make this plot more readable by introducing an alpha level of
+1/4.  This helps, but the vast amount of average observations still present 
+make the effect of quality increasing as sulphates do hard to see.  
+
+In the box plot below I think the relationship is again easier to see.  This 
+time I've also taken off the top and bottom 5% of sulphate observations to 
+make the interquartile range appear bigger.  It's worth noting though how small
+the variance in levels is.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Bivariate_Plots_S2}
+ggplot(aes(x = quality, y = sulphates, group = q.cat), data = subset(wines, 
+            sulphates >= quantile(wines$sulphates, 0.05) &
+            sulphates <= quantile(wines$sulphates, 0.95)) ) +
+  geom_boxplot(aes(color=q.cat))
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Bivariate_Plots_C1}
+ggplot(aes(x = citric.acid, y = quality), data = wines) +
+  xlim(quantile(wines$citric.acid, 0.05), quantile(wines$citric.acid, 0.95)) +
+  geom_point(aes(color = quality), alpha = 1/4)
+```
+
+The above scatter plots show the relationship between citric acids and quality.
+Like the previous plots I've attempted to make this plot more readable by 
+introducing an alpha level of 1/4.  This again makes the higher number of light
+blue observations at higher citric acid easier to see, but is still somewhat 
+masked by the large amount of average quality observations.
+
+In the box plot below I think the relationship is again easier to see.  This 
+time I've again taken off the top and bottom 5% of citric acid observations to 
+make the interquartile range appear bigger.  It's worth noting again how small
+the variance in levels is.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Bivariate_Plots_C2}
+ggplot(aes(x = quality, y = citric.acid, group = q.cat), data = subset(wines, 
+            citric.acid >= quantile(wines$citric.acid, 0.05) &
+            citric.acid <= quantile(wines$citric.acid, 0.95)) ) +
+  geom_boxplot(aes(color=q.cat))
+
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Bivariate_Plots_M1}
+ggplot(aes(x= pH , y = fixed.acidity), data = wines) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'red')
+
+```
+
+I didn't really find much interesting in the relationships between the other 
+variables.  It may be useful in looking for erroneous data that some of the 
+relationships should be linear.  In the example above, the strongest relation-
+ship I found with a negative correlation of ???0.683 was PH v fixed acidity. This
+is expected; as acidity levels go down, PH goes up.  The variation in the 
+relationship can be explained by the other chemicals - the amount of chlorides,
+etc.
+
+I was surprised by the residual sugar content having little effect on the 
+quality of the wine.  Like the alcohol content, I expected the judges to have
+a subconscious reaction to the sugar.  It appears from the graph below that the 
+residual sugar levels in almost all the wines are pretty low, and drop off for
+the very high quality wines.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Bivariate_Plots_M2}
+ggplot(aes(x = quality, y = residual.sugar), data = wines) +
+  geom_point(alpha = 1/4)
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Bivariate_Plots_M3}
+ggplot(aes(x = alcohol, y = density), data = wines) +
+  geom_point() +
+  geom_smooth(method = 'lm', color = 'red')
+```
+
+Another relationship I found interesting was between density and alcohol with 
+an actual value of ???0.496.  I would have expected the opposite and I think this
+reflects my poor knowledge of how wines are produced.  I'd have expected the 
+wine to get denser as it ferments, but perhaps it is decanted during the 
+process.
+
+# Multivariate Analysis
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Multivariate_Plots_1}
+
+ggplot(aes(x = quality, y = alcohol, color = volatile.acidity), data = wines) +
+    geom_jitter(alpha = 1/3, size = 3) +
+    scale_colour_gradient2(low = "red", high = "blue",
+                           mid="#9933CC",midpoint = 0.8) +
+    geom_smooth(method = 'lm', color = 'yellow')
+```
+
+The above plot is a bit noisy, but I think shows the main relationships that
+affect wine quality.  The yellow line shows a general upward trend for quality
+increasing as alcohol increases.  We can also see a lot more blue (high vol-
+atile acidity at the left hand side of the plot, indicating acidity decreases
+as quality increases.  I've added jitter to this plot and the next few to try
+and make the scale look a bit more continuous.
+
+We can see similar effects with sulphates below.  Sulphates help prevent a wine
+oxidising, so as expected we see quality increase as sulphates do.  This affect
+is limited though as too much sulphates results in a wine that is too dense.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Multivariate_Plots_2}
+
+ggplot(aes(x = quality, y = sulphates, color = density), data = wines) +
+geom_jitter(alpha = 1/3, size = 3) +
+scale_colour_gradient2(low = "red", high = "blue",
+                       mid="#9933CC",midpoint = 0.997) +
+geom_smooth(method = 'lm', color = 'yellow')
+
+```
+
+Similar effects can also be seen with citric acids below.  They are said to add
+"freshness" to wine, but are illegal to add to wine in the EU except in 
+specific circumstances.  I had hoped to do more analysis of this, but the 
+citric acid levels are so low, I don't think it's worth continuing.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Multivariate_Plots_3}
+ggplot(aes(x = quality, y = citric.acid, color = pH), data = wines) +
+    geom_jitter(alpha = 1/3, size = 3) + 
+    scale_colour_gradient2(low = "red", high = "blue",
+                           mid="#9933CC", midpoint = 3.31) +
+    geom_smooth(method = 'lm', color = 'yellow')
+```
+
+
+# Final Plots and Summary
+
+I think these are the three most useful plots that I found :
+
+### Plot One
+```{r echo=FALSE, message=FALSE, warning=FALSE, Plot_One}
+ggplot(wines, aes(x=factor(quality), fill=I("blue"), col=I("black"))) + 
+  geom_bar() +
+  labs(title="Quality Score Counts") +
+  labs(x="Quality Score", y="Count")
+```
+
+### Description One
+
+The first plot is a simple histogram of the quality ratings.  This shows some 
+of the limitations of the data set.  The ratings for quality are discrete, 
+rather than continuous.  There's also a disparate number of 'average' ratings 
+in the 5-6 range.  The similarity of quality observations might be in part 
+explained by the fact that all the observations are of the Portuguese 
+"Vinho Verde" red wine.
+
+It's worth noting also that there are only six different scores observed which 
+I've divided into three quality categories.  Wines that scored 3 or 4 are in 
+the "poor" category, wines that scored 5 or 6 are in the "fair" category, and
+wines that scored 7 or 8 are in the "good" category.
+
+### Plot Two
+```{r echo=FALSE, message=FALSE, warning=FALSE, Plot_Two}
+ggplot(aes(x = quality, y = alcohol, group = q.cat), 
+       data = subset(wines, alcohol >= quantile(wines$alcohol, 0.05) &
+                        alcohol <= quantile(wines$alcohol, 0.95)) ) +
+  geom_boxplot(aes(color=q.cat)) +
+  labs(title="Alcohol Levels") +
+  labs(x="Quality Score", y="% Alcohol")
+
+```
+
+### Description Two
+
+This is similar to the earlier box plot of alcohol vs quality.  I've cut off
+the top and bottom 5% of outliers to better show the relationship.  This makes
+it easier to see the interquartile alcohol range of the "good" quality wines 
+is higher than "fair"" or "poor".
+
+Alcohol has a correlation of .4796 with quality which is moderate; as alcohol
+levels go up, quality scores generally go up too.  This effect seems largest
+with the "good"" quality wines.  The mean alcohol percentage of "poor" and 
+"fair" wines are 10.22 and 10.25 respectively, but the mean for "good" wines
+is 11.52.
+
+### Plot Three
+```{r echo=FALSE, message=FALSE, warning=FALSE, Plot_Three}
+ggplot(aes(x = quality, y = volatile.acidity, group = q.cat), 
+       data = subset(wines, 
+            volatile.acidity >= quantile(wines$volatile.acidity, 0.05) &
+            volatile.acidity <= quantile(wines$volatile.acidity, 0.95)) ) +
+  geom_boxplot(aes(color=q.cat)) +
+  labs(title="Volatile Acidity Levels") +
+  labs(x="Quality Score", y="Volatile Acidity g / dm^3")
+
+```
+
+### Description Three
+
+This is again similar to the earlier box plot of volatile acidity vs quality. 
+I've cut off the top and bottom 5% of outliers to better show the relationship.
+This makes it easier to see the interquartile volatile acidity range of the 
+"good"" quality wines is lower than "fair"" or "poor".
+
+Volatile acidity has a negative correlation of -0.391 with quality which is 
+small but meaningful; as volatile acidity levels go down, quality scores 
+generally go up.  This effect seems more linear than what we see with alcohol.
+The mean volatile acidity level of "poor" wines is .72, the mean for "fair" 
+wines is .54, and the mean for "good" wines is .4.
+
+------
+
+# Reflection
+
+The dataset is relatively small with relatively few inputs, so it was easy to
+identify the main variables that affect the quality rating.  The largest was 
+alcohol with a moderate correlation.  The next largest was volatile acidity
+with a small but meaningful correlation.  
+
+The dataset itself isn't very diverse.  The majority observations are at average
+quality levels and the quality scores themselves are discrete integers.  I've 
+used jitter in some of the plots to try and make the relationships seem more 
+linear.  I also added a quality category (q.cat) variable to separate quality 
+scores into ranges.  Not only do I think most people would be more interested 
+in what category a wine is in rather than a numeric score, but I feel this made
+it easier to see the relationships between the variables.
+
+This project is already overdue, but I wish I had more time to explore the 
+data.  I'd have liked to explore the main inputs (alcohol and volatile acidity)
+that affected quality more.  I believe I would have needed to research the 
+other inputs themselves more, to see if I could find information on how they
+typically affect each other.  Some relationships are obvious (e.g. : residual 
+sugar and density), but the relationship between sulphates, SO2 and acidity 
+levels could be more complex, and combine to affect the quality rating.
+
+In the future I'd like to explore larger data sets with more diverse wines. 
+Though I'm unsure if I'd find the same insights, I feel this dataset was very 
+limited in it's scope, and if I had developed a prediction model from it, I 
+would worry that it would only be applicable to the type of wine studied.  I
+think it would also be more useful to introduce a more continuous quality
+rating scale.  The ratings are described as an average of ratings by 3 or 
+more experts; there must have been some detail lost in the process.

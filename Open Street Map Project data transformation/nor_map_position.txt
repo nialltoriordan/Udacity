@@ -1,0 +1,7 @@
+https://mapzen.com/data/metro-extracts/metro/dublin_ireland/
+
+Short description of the area.
+The sample map for Dublin City, Republic of Ireland.
+
+Reason for choice.
+Dublin is the only city in my country large enough to meet the project requirements, and in choosing this map I hoped to encounter (and resolve) problems unique to data sets dealing with Ireland.

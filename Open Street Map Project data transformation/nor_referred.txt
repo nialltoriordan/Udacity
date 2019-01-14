@@ -1,0 +1,8 @@
+My cleaning program is based off the code provided for the OSM case study.
+
+A lot of my mongodb code is based on the example given here :
+https://github.com/Dalaska/Udacity-Data-Wrangling-Clean-OpenStreetMap/blob/master/step4_analysis.py#L73
+
+
+
+
